@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart Home Energy Monitor — Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    /* ── Design tokens ────────────────────────────────── */
+    :root {
+      --bg-deep:    #0a1628;
+      --bg-card:    #111f35;
+      --bg-card2:   #162236;
+      --accent:     #00c9b1;
+      --accent2:    #ff7f50;
+      --warn:       #ffa726;
+      --danger:     #ef5350;
+      --ok:         #66bb6a;
+      --text:       #e8edf5;
+      --muted:      #7a8fa6;
+      --border:     #1e3050;
+      --font-mono:  'Courier New', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-deep);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ───────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 32px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card);
+    }
+    header h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.04em;
+    }
+    header h1 span { color: var(--text); font-weight: 400; }
+    .live-badge {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.78rem; color: var(--ok); font-weight: 600;
+    }
+    .live-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: var(--ok);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.4; transform: scale(1.4); }
+    }
+
+    /* ── Layout ───────────────────────────────────────── */
+    main { padding: 28px 32px; max-width: 1400px; margin: 0 auto; }
+
+    /* ── KPI Cards ────────────────────────────────────── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+    .kpi {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s;
+    }
+    .kpi:hover { border-color: var(--accent); }
+    .kpi::before {
+      content: '';
+      position: absolute; top: 0; left: 0;
+      width: 4px; height: 100%;
+      background: var(--kpi-color, var(--accent));
+    }
+    .kpi-label {
+      font-size: 0.72rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+    .kpi-value {
+      font-size: 2rem; font-weight: 700;
+      color: var(--kpi-color, var(--accent));
+      font-family: var(--font-mono);
+      line-height: 1;
+    }
+    .kpi-unit {
+      font-size: 0.8rem; color: var(--muted);
+      margin-top: 6px;
+    }
+    .kpi-icon {
+      position: absolute; right: 16px; top: 16px;
+      font-size: 1.6rem; opacity: 0.18;
+    }
+
+    /* Alert KPI variant */
+    .kpi.alert-high  { border-color: var(--danger) !important; }
+    .kpi.alert-high::before { background: var(--danger); }
+    .kpi.alert-ok    { border-color: var(--ok); }
+    .kpi.alert-ok::before { background: var(--ok); }
+
+    /* ── Chart grid ───────────────────────────────────── */
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+    @media (max-width: 768px) { .chart-grid { grid-template-columns: 1fr; } }
+
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px;
+    }
+    .chart-card.wide { grid-column: span 2; }
+    @media (max-width: 768px) { .chart-card.wide { grid-column: span 1; } }
+
+    .chart-title {
+      font-size: 0.82rem; font-weight: 600;
+      color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.08em; margin-bottom: 16px;
+    }
+    .chart-wrap { position: relative; height: 220px; }
+    .chart-wrap.tall { height: 280px; }
+
+    /* ── Alert log ────────────────────────────────────── */
+    .alert-log {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 28px;
+    }
+    .alert-log h3 {
+      font-size: 0.82rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 14px;
+    }
+    .alert-entries { max-height: 160px; overflow-y: auto; }
+    .alert-entry {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+    }
+    .alert-entry:last-child { border-bottom: none; }
+    .alert-badge {
+      padding: 2px 8px; border-radius: 20px;
+      font-size: 0.7rem; font-weight: 700;
+      min-width: 72px; text-align: center;
+    }
+    .badge-high     { background: #ef535020; color: var(--danger); border: 1px solid var(--danger); }
+    .badge-normal   { background: #66bb6a20; color: var(--ok);     border: 1px solid var(--ok);    }
+    .badge-overload { background: #ffa72620; color: var(--warn);   border: 1px solid var(--warn);  }
+
+    /* ── Controls ─────────────────────────────────────── */
+    .controls {
+      display: flex; gap: 12px; flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+    button {
+      padding: 9px 20px; border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card2); color: var(--text);
+      font-size: 0.82rem; cursor: pointer;
+      transition: all 0.2s;
+    }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    button.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+    .mode-label { font-size: 0.75rem; color: var(--muted); align-self: center; }
+
+    /* ── Stats row ────────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+    .stat-card {
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .stat-card h4 { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat-item { font-size: 0.78rem; }
+    .stat-item span { color: var(--accent); font-weight: 600; font-family: var(--font-mono); }
+
+    footer {
+      text-align: center; padding: 20px;
+      font-size: 0.72rem; color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Smart Home <span>Energy Monitor</span></h1>
+  <div class="live-badge"><div class="live-dot"></div>LIVE SIMULATION</div>
+</header>
+
+<main>
+
+  <!-- Controls -->
+  <div class="controls">
+    <span class="mode-label">Simulation Mode:</span>
+    <button class="active" onclick="setMode('normal',this)">🏠 Normal</button>
+    <button onclick="setMode('high',this)">🔥 High Load</button>
+    <button onclick="setMode('overload',this)">🚨 Overload</button>
+    <button onclick="setMode('mixed',this)">🔄 Mixed</button>
+    <button onclick="resetSim()" style="margin-left:auto;">↺ Reset</button>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi" style="--kpi-color:#00c9b1">
+      <div class="kpi-icon">⚡</div>
+      <div class="kpi-label">Voltage</div>
+      <div class="kpi-value" id="kpi-voltage">–</div>
+      <div class="kpi-unit">Volts (V)</div>
+    </div>
+    <div class="kpi" style="--kpi-color:#ff7f50">
+      <div class="kpi-icon">〜</div>
+      <div class="kpi-label">Current</div>
+      <div class="kpi-value" id="kpi-current">–</div>
+      <div class="kpi-unit">Amperes (A)</div>
+    </div>
+    <div class="kpi" style="--kpi-color:#a78bfa">
+      <div class="kpi-icon">💡</div>
+      <div class="kpi-label">Power</div>
+      <div class="kpi-value" id="kpi-power">–</div>
+      <div class="kpi-unit">Watts (W)</div>
+    </div>
+    <div class="kpi" style="--kpi-color:#34d399">
+      <div class="kpi-icon">📊</div>
+      <div class="kpi-label">Energy Used</div>
+      <div class="kpi-value" id="kpi-energy">–</div>
+      <div class="kpi-unit">Wh (session)</div>
+    </div>
+    <div class="kpi" style="--kpi-color:#fbbf24">
+      <div class="kpi-icon">₹</div>
+      <div class="kpi-label">Cost</div>
+      <div class="kpi-value" id="kpi-cost">–</div>
+      <div class="kpi-unit">INR (session)</div>
+    </div>
+    <div class="kpi alert-ok" id="kpi-alert-card" style="--kpi-color:#66bb6a">
+      <div class="kpi-icon">🔔</div>
+      <div class="kpi-label">Alert Status</div>
+      <div class="kpi-value" id="kpi-alert" style="font-size:1.2rem">NORMAL</div>
+      <div class="kpi-unit" id="kpi-alert-sub">All systems nominal</div>
+    </div>
+  </div>
+
+  <!-- Charts Row 1 -->
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-title">⚡ Voltage (V) — Real-time</div>
+      <div class="chart-wrap"><canvas id="chartVoltage"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">〜 Current (A) — Real-time</div>
+      <div class="chart-wrap"><canvas id="chartCurrent"></canvas></div>
+    </div>
+    <div class="chart-card wide">
+      <div class="chart-title">💡 Power Consumption (W) — with Alert Threshold</div>
+      <div class="chart-wrap tall"><canvas id="chartPower"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">📈 Cumulative Energy (Wh)</div>
+      <div class="chart-wrap"><canvas id="chartEnergy"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">🥧 Alert Distribution</div>
+      <div class="chart-wrap"><canvas id="chartAlerts"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Projection stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <h4>📅 Daily Projection</h4>
+      <div class="stat-grid">
+        <div class="stat-item">Energy: <span id="proj-daily-kwh">—</span> kWh</div>
+        <div class="stat-item">Cost: <span id="proj-daily-cost">—</span> ₹</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <h4>📆 Monthly Projection</h4>
+      <div class="stat-grid">
+        <div class="stat-item">Energy: <span id="proj-monthly-kwh">—</span> kWh</div>
+        <div class="stat-item">Cost: <span id="proj-monthly-cost">—</span> ₹</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <h4>📊 Session Statistics</h4>
+      <div class="stat-grid">
+        <div class="stat-item">Peak W: <span id="stat-peak">—</span></div>
+        <div class="stat-item">Avg W: <span id="stat-avg">—</span></div>
+        <div class="stat-item">Samples: <span id="stat-samples">—</span></div>
+        <div class="stat-item">Alerts: <span id="stat-alerts">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert log -->
+  <div class="alert-log">
+    <h3>🔔 Alert Log</h3>
+    <div class="alert-entries" id="alert-log"></div>
+  </div>
+
+</main>
+
+<footer>
+  Smart Home Energy Monitoring System &nbsp;|&nbsp; IoT Course Project &nbsp;|&nbsp;
+  Simulated @ ₹7/kWh (Hyderabad TSSPDCL) &nbsp;|&nbsp; Threshold: 3000W
+</footer>
+
+<script>
+// ─────────────────────────────────────────────────────────────────
+// SIMULATION ENGINE
+// ─────────────────────────────────────────────────────────────────
+const COST_PER_KWH = 7.0;
+const THRESHOLD_W  = 3000;
+const POWER_FACTOR = 0.9;
+const INTERVAL_MS  = 2000;
+const MAX_POINTS   = 40;
+
+const PROFILES = {
+  normal:   { baseI: 2.06, voltageBase: 230 },
+  high:     { baseI: 12.61, voltageBase: 226 },
+  overload: { baseI: 22.48, voltageBase: 219 },
+};
+
+let mode          = 'normal';
+let sampleCount   = 0;
+let energyWh      = 0;
+let alertCounts   = { NORMAL: 0, HIGH: 0, OVERLOAD: 0 };
+let powerSamples  = [];
+let intervalId    = null;
+let mixedCycle    = 0;
+const mixedPhases = ['normal','normal','high','overload','high','normal'];
+
+function jitter(val, pct=0.02) {
+  return val * (1 + (Math.random()*2-1)*pct);
+}
+
+function sample() {
+  let activeMode = mode;
+  if (mode === 'mixed') activeMode = mixedPhases[mixedCycle++ % mixedPhases.length];
+
+  const prof    = PROFILES[activeMode];
+  const current = jitter(prof.baseI, 0.025);
+  const voltage = jitter(prof.voltageBase, 0.008);
+  const power   = voltage * current * POWER_FACTOR;
+  const dtHours = INTERVAL_MS / 3_600_000;
+  energyWh     += power * dtHours;
+  const cost    = (energyWh / 1000) * COST_PER_KWH;
+  sampleCount++;
+
+  let alertStatus = power >= THRESHOLD_W * 2 ? 'OVERLOAD'
+                  : power >= THRESHOLD_W      ? 'HIGH'
+                  : 'NORMAL';
+  alertCounts[alertStatus]++;
+  powerSamples.push(power);
+
+  return { voltage, current, power, energy: energyWh, cost, alertStatus };
+}
+
+// ─────────────────────────────────────────────────────────────────
+// CHART SETUP
+// ─────────────────────────────────────────────────────────────────
+const CHART_DEFAULTS = {
+  responsive: true, maintainAspectRatio: false,
+  animation: { duration: 300 },
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { ticks: { color: '#7a8fa6', maxTicksLimit: 6 }, grid: { color: '#1e3050' } },
+    y: { ticks: { color: '#7a8fa6' }, grid: { color: '#1e3050' } },
+  },
+};
+
+function mkLabels() { return Array.from({length: MAX_POINTS}, (_,i) => i+1); }
+
+function lineChart(id, color, yLabel='', extra={}) {
+  const ctx = document.getElementById(id).getContext('2d');
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels: mkLabels(), datasets: [{
+      data: new Array(MAX_POINTS).fill(null),
+      borderColor: color, borderWidth: 2,
+      pointRadius: 2, pointBackgroundColor: color,
+      tension: 0.4, fill: true,
+      backgroundColor: color + '18',
+    }]},
+    options: { ...CHART_DEFAULTS, scales: {
+      ...CHART_DEFAULTS.scales,
+      y: { ...CHART_DEFAULTS.scales.y, title: { display: !!yLabel, text: yLabel, color: '#7a8fa6' } }
+    }, ...extra }
+  });
+}
+
+const charts = {
+  voltage : lineChart('chartVoltage', '#00c9b1', 'V'),
+  current : lineChart('chartCurrent', '#ff7f50', 'A'),
+  power   : lineChart('chartPower',   '#a78bfa', 'W'),
+  energy  : lineChart('chartEnergy',  '#34d399', 'Wh'),
+};
+
+// Power chart: bar variant with threshold line
+const ctxPower = document.getElementById('chartPower').getContext('2d');
+charts.power.destroy();
+charts.power = new Chart(ctxPower, {
+  type: 'bar',
+  data: {
+    labels: mkLabels(),
+    datasets: [
+      { data: new Array(MAX_POINTS).fill(null), backgroundColor: [], borderRadius: 4 },
+      { type: 'line', data: new Array(MAX_POINTS).fill(THRESHOLD_W),
+        borderColor: '#ef535099', borderWidth: 1.5, borderDash: [6,4],
+        pointRadius: 0, label: 'Threshold', fill: false }
+    ]
+  },
+  options: {
+    ...CHART_DEFAULTS,
+    plugins: { legend: { display: true, labels: { color: '#7a8fa6', boxWidth: 12 } } },
+    scales: CHART_DEFAULTS.scales,
+  }
+});
+
+// Donut alert chart
+const ctxAlerts = document.getElementById('chartAlerts').getContext('2d');
+const alertChart = new Chart(ctxAlerts, {
+  type: 'doughnut',
+  data: {
+    labels: ['Normal', 'High', 'Overload'],
+    datasets: [{ data: [1, 0, 0], backgroundColor: ['#66bb6a', '#ef5350', '#ffa726'], borderWidth: 0 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'bottom', labels: { color: '#7a8fa6', padding: 14, boxWidth: 12 } } },
+    cutout: '62%',
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// PUSH DATA TO CHARTS + UI
+// ─────────────────────────────────────────────────────────────────
+function pushToChart(chart, value, colorFn) {
+  const ds = chart.data.datasets[0];
+  if (ds.data.length >= MAX_POINTS) { ds.data.shift(); if (colorFn && ds.backgroundColor) ds.backgroundColor.shift(); }
+  ds.data.push(parseFloat(value.toFixed(3)));
+  if (colorFn) {
+    if (!ds.backgroundColor) ds.backgroundColor = [];
+    ds.backgroundColor.push(colorFn(value));
+  }
+  chart.update('none');
+}
+
+function updateKPIs(d) {
+  document.getElementById('kpi-voltage').textContent = d.voltage.toFixed(1);
+  document.getElementById('kpi-current').textContent = d.current.toFixed(3);
+  document.getElementById('kpi-power').textContent   = d.power.toFixed(1);
+  document.getElementById('kpi-energy').textContent  = d.energy.toFixed(4);
+  document.getElementById('kpi-cost').textContent    = d.cost.toFixed(4);
+
+  const alertCard = document.getElementById('kpi-alert-card');
+  const alertEl   = document.getElementById('kpi-alert');
+  const alertSub  = document.getElementById('kpi-alert-sub');
+  alertCard.className = 'kpi ' + (d.alertStatus === 'NORMAL' ? 'alert-ok' : 'alert-high');
+  alertEl.textContent  = d.alertStatus;
+  alertEl.style.color  = d.alertStatus === 'NORMAL' ? 'var(--ok)' : d.alertStatus === 'HIGH' ? 'var(--danger)' : 'var(--warn)';
+  alertSub.textContent = d.alertStatus === 'NORMAL' ? 'All systems nominal'
+                       : d.alertStatus === 'HIGH'   ? `Power exceeds ${THRESHOLD_W}W threshold!`
+                       : '⚠ OVERLOAD — Relay would trip!';
+}
+
+function updateProjections(avgPower) {
+  const dailyKwh = (avgPower * 24) / 1000;
+  document.getElementById('proj-daily-kwh').textContent   = dailyKwh.toFixed(2);
+  document.getElementById('proj-daily-cost').textContent  = (dailyKwh * COST_PER_KWH).toFixed(2);
+  document.getElementById('proj-monthly-kwh').textContent = (dailyKwh * 30).toFixed(2);
+  document.getElementById('proj-monthly-cost').textContent= (dailyKwh * 30 * COST_PER_KWH).toFixed(2);
+  document.getElementById('stat-samples').textContent = sampleCount;
+  document.getElementById('stat-peak').textContent    = Math.max(...powerSamples).toFixed(1);
+  document.getElementById('stat-avg').textContent     = avgPower.toFixed(1);
+  document.getElementById('stat-alerts').textContent  = alertCounts.HIGH + alertCounts.OVERLOAD;
+}
+
+function logAlert(d) {
+  const log = document.getElementById('alert-log');
+  const ts  = new Date().toLocaleTimeString();
+  const cls = d.alertStatus === 'NORMAL' ? 'badge-normal'
+            : d.alertStatus === 'HIGH'   ? 'badge-high' : 'badge-overload';
+  const row = document.createElement('div');
+  row.className = 'alert-entry';
+  row.innerHTML = `
+    <span class="alert-badge ${cls}">${d.alertStatus}</span>
+    <span style="color:var(--muted)">${ts}</span>
+    <span>V=${d.voltage.toFixed(1)}V &nbsp; I=${d.current.toFixed(3)}A &nbsp; P=${d.power.toFixed(1)}W</span>
+  `;
+  log.insertBefore(row, log.firstChild);
+  if (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MAIN TICK
+// ─────────────────────────────────────────────────────────────────
+function tick() {
+  const d = sample();
+
+  updateKPIs(d);
+
+  pushToChart(charts.voltage, d.voltage);
+  pushToChart(charts.current, d.current);
+  pushToChart(charts.energy,  d.energy);
+
+  // Power bar — color by alert
+  const ds0 = charts.power.data.datasets[0];
+  const ds1 = charts.power.data.datasets[1];
+  if (ds0.data.length >= MAX_POINTS) { ds0.data.shift(); ds0.backgroundColor.shift(); }
+  if (ds1.data.length >= MAX_POINTS)   ds1.data.shift();
+  ds0.data.push(parseFloat(d.power.toFixed(2)));
+  ds0.backgroundColor.push(d.alertStatus === 'NORMAL' ? '#a78bfa' : d.alertStatus === 'HIGH' ? '#ef5350' : '#ffa726');
+  ds1.data.push(THRESHOLD_W);
+  charts.power.update('none');
+
+  // Alert donut
+  alertChart.data.datasets[0].data = [alertCounts.NORMAL, alertCounts.HIGH, alertCounts.OVERLOAD];
+  alertChart.update('none');
+
+  // Projections
+  const avg = powerSamples.reduce((a,b) => a+b, 0) / powerSamples.length;
+  updateProjections(avg);
+
+  // Log every sample to alert log
+  logAlert(d);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// CONTROLS
+// ─────────────────────────────────────────────────────────────────
+function setMode(m, btn) {
+  mode = m;
+  document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+function resetSim() {
+  sampleCount = 0; energyWh = 0;
+  alertCounts = { NORMAL: 0, HIGH: 0, OVERLOAD: 0 };
+  powerSamples = []; mixedCycle = 0;
+  [charts.voltage, charts.current, charts.energy].forEach(c => {
+    c.data.datasets[0].data = new Array(MAX_POINTS).fill(null); c.update('none');
+  });
+  charts.power.data.datasets[0].data = new Array(MAX_POINTS).fill(null);
+  charts.power.data.datasets[0].backgroundColor = [];
+  charts.power.data.datasets[1].data = new Array(MAX_POINTS).fill(THRESHOLD_W);
+  charts.power.update('none');
+  alertChart.data.datasets[0].data = [1,0,0]; alertChart.update('none');
+  document.getElementById('alert-log').innerHTML = '';
+  ['kpi-voltage','kpi-current','kpi-power','kpi-energy','kpi-cost'].forEach(id => document.getElementById(id).textContent = '–');
+}
+
+// Start simulation
+tick();
+intervalId = setInterval(tick, INTERVAL_MS);
+</script>
+</body>
+</html>

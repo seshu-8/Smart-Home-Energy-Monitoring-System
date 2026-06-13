@@ -1,0 +1,9 @@
+# Smart Home Energy Monitoring System
+# Python Dependencies
+# Install with: pip install -r requirements.txt
+
+matplotlib>=3.7.0      # Charts, graphs, PDF report generation
+fpdf2>=2.7.0           # PDF generation (optional, matplotlib used as fallback)
+numpy>=1.24.0          # Numerical computing (used by matplotlib internally)
+pandas>=2.0.0          # Data analysis of CSV logs (optional, for advanced analytics)
+requests>=2.31.0       # HTTP requests for ThingSpeak API (alternative to urllib)

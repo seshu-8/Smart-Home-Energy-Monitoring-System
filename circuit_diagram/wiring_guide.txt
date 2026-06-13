@@ -1,0 +1,124 @@
+CIRCUIT DIAGRAM — ESP32 Smart Energy Monitor
+============================================
+
+COMPONENT CONNECTIONS:
+─────────────────────────────────────────────────────────────
+
+1. ACS712-30A CURRENT SENSOR
+   ┌──────────────┬───────────────────┬──────────────────────┐
+   │ ACS712 Pin   │ Connects To       │ Notes                │
+   ├──────────────┼───────────────────┼──────────────────────┤
+   │ VCC          │ ESP32 3.3V        │ Use 3.3V NOT 5V      │
+   │ GND          │ ESP32 GND         │ Common ground        │
+   │ OUT          │ ESP32 GPIO34      │ ADC1 channel only    │
+   │ IP+          │ Live wire IN      │ AC line through hole │
+   │ IP-          │ Live wire OUT     │ To load              │
+   └──────────────┴───────────────────┴──────────────────────┘
+   ⚠ WARNING: IP+ and IP- carry MAINS VOLTAGE (230V AC)
+   Use isolation and proper enclosure when testing with real AC
+
+2. ZMPT101B VOLTAGE SENSOR
+   ┌──────────────┬───────────────────┬──────────────────────┐
+   │ ZMPT101B Pin │ Connects To       │ Notes                │
+   ├──────────────┼───────────────────┼──────────────────────┤
+   │ VCC          │ ESP32 3.3V        │                      │
+   │ GND          │ ESP32 GND         │                      │
+   │ OUT          │ ESP32 GPIO35      │ ADC1 channel         │
+   │ AC IN 1      │ Live (Phase) line │ Through transformer  │
+   │ AC IN 2      │ Neutral line      │                      │
+   └──────────────┴───────────────────┴──────────────────────┘
+
+3. 0.96" OLED DISPLAY (SSD1306, I2C)
+   ┌──────────────┬───────────────────┬──────────────────────┐
+   │ OLED Pin     │ Connects To       │ Notes                │
+   ├──────────────┼───────────────────┼──────────────────────┤
+   │ VCC          │ ESP32 3.3V        │                      │
+   │ GND          │ ESP32 GND         │                      │
+   │ SDA          │ ESP32 GPIO21      │ I2C Data             │
+   │ SCL          │ ESP32 GPIO22      │ I2C Clock            │
+   └──────────────┴───────────────────┴──────────────────────┘
+   Default I2C address: 0x3C
+
+4. ACTIVE BUZZER
+   ┌──────────────┬───────────────────┬──────────────────────┐
+   │ Buzzer Pin   │ Connects To       │ Notes                │
+   ├──────────────┼───────────────────┼──────────────────────┤
+   │ + (longer)   │ ESP32 GPIO26      │ Via 100Ω resistor    │
+   │ - (shorter)  │ ESP32 GND         │                      │
+   └──────────────┴───────────────────┴──────────────────────┘
+
+5. LED INDICATORS
+   ┌──────────────┬───────────────────┬──────────────────────┐
+   │ LED          │ Connects To       │ Notes                │
+   ├──────────────┼───────────────────┼──────────────────────┤
+   │ RED LED (+)  │ ESP32 GPIO27      │ Via 330Ω resistor    │
+   │ RED LED (-)  │ GND               │ Alert indicator      │
+   │ GREEN LED(+) │ ESP32 GPIO25      │ Via 330Ω resistor    │
+   │ GREEN LED(-) │ GND               │ Normal indicator     │
+   └──────────────┴───────────────────┴──────────────────────┘
+
+6. 5V RELAY MODULE (for load control)
+   ┌──────────────┬───────────────────┬──────────────────────┐
+   │ Relay Pin    │ Connects To       │ Notes                │
+   ├──────────────┼───────────────────┼──────────────────────┤
+   │ VCC          │ ESP32 5V (VIN)    │ Relay needs 5V coil  │
+   │ GND          │ ESP32 GND         │                      │
+   │ IN           │ ESP32 GPIO32      │ Active LOW control   │
+   │ COM          │ Live AC line      │ ⚠ MAINS VOLTAGE      │
+   │ NO           │ To load           │ Normally Open        │
+   └──────────────┴───────────────────┴──────────────────────┘
+
+─────────────────────────────────────────────────────────────
+ASCII WIRING DIAGRAM
+─────────────────────────────────────────────────────────────
+
+                    ┌─────────────────────────┐
+                    │         ESP32            │
+              3.3V ─┤ 3V3              GPIO34 ├─── ACS712 OUT
+               GND ─┤ GND              GPIO35 ├─── ZMPT101B OUT
+              3.3V ─┤ 3V3              GPIO21 ├─── OLED SDA
+               GND ─┤ GND              GPIO22 ├─── OLED SCL
+                    │                  GPIO26 ├─── Buzzer (+)
+                    │                  GPIO27 ├─┬─[330Ω]─ RED LED (+)
+                    │                  GPIO25 ├─┼─[330Ω]─ GREEN LED (+)
+                    │                  GPIO32 ├─┘ Relay IN
+                5V ─┤ VIN              GPIO34 │
+                    └─────────────────────────┘
+
+  ACS712                ZMPT101B             OLED (I2C)
+  ┌──────┐              ┌──────┐             ┌──────┐
+  │ VCC  │──── 3.3V     │ VCC  │──── 3.3V   │ VCC  │──── 3.3V
+  │ GND  │──── GND      │ GND  │──── GND    │ GND  │──── GND
+  │ OUT  │──── GPIO34   │ OUT  │──── GPIO35  │ SDA  │──── GPIO21
+  │ IP+  │──── Live In  │ AC1  │──── Phase   │ SCL  │──── GPIO22
+  │ IP─  │──── Load     │ AC2  │──── Neutral └──────┘
+  └──────┘              └──────┘
+
+─────────────────────────────────────────────────────────────
+IMPORTANT SAFETY NOTES
+─────────────────────────────────────────────────────────────
+1. The ACS712 and ZMPT101B interface with MAINS VOLTAGE (230V AC).
+   - Do NOT touch IP+/IP- or AC terminals when power is on
+   - Use a proper plastic enclosure for all mains connections
+   - For learning/testing, use a low-voltage (5-12V DC) test bench first
+   - The LOW-VOLTAGE side (OUT, VCC, GND) is safe for ESP32
+
+2. ADC Pin restrictions on ESP32:
+   - GPIO34, GPIO35 are INPUT-ONLY ADC1 pins — correct for sensors
+   - GPIO32-GPIO39 are ADC1 — use these for analog sensors
+   - DO NOT use GPIO0, GPIO2 (strapping pins) for sensors
+
+3. Power supply:
+   - USB 5V → ESP32 VIN works fine for bench testing
+   - For permanent installation: use 5V/2A USB wall adapter
+   - Never power ESP32 from the mains relay output directly
+
+─────────────────────────────────────────────────────────────
+SIMULATION ALTERNATIVE (no hardware needed)
+─────────────────────────────────────────────────────────────
+Use Wokwi simulator: https://wokwi.com
+  - Supports ESP32, ACS712, OLED, LEDs, Buzzer
+  - Free online, no hardware required
+  - Load the arduino_code/energy_monitor.ino file
+  - Add components matching the wiring above
+  - Screenshot simulation for GitHub portfolio

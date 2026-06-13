@@ -1,0 +1,10 @@
+# Wokwi Library Manager
+# These libraries are auto-installed when you open the project in Wokwi
+# Do NOT manually edit this file
+
+- name: Adafruit SSD1306
+  version: 2.5.7
+- name: Adafruit GFX Library
+  version: 1.11.5
+- name: Adafruit BusIO
+  version: 1.14.1
